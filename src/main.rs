@@ -1,17 +1,14 @@
+mod calendar;
 mod cli;
 mod date;
+mod event;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let command = cli::parse_cli()?;
 
     match command {
         cli::CalendarCommand::List(args) => {
-            println!("query: {:?}", args.query);
-            println!("From: {:?}", args.from);
-            println!("To: {:?}", args.to);
-            println!("Limit: {:?}", args.limit);
-            println!("Id: {:?}", args.id);
-            println!("Calendar: {:?}", args.calendar);
+            event::list(args);
         }
         cli::CalendarCommand::Add(args) => {
             println!("Calendar: {:?}", args.calendar);
