@@ -30,14 +30,14 @@
         pname = "calendar-rs";
         version = "1.0.0";
         src = ./.;
-        cargoHash = "";
+        cargoHash = "sha256-1F3XoUkKolz8dLcU0jXLSs5OBQIv9/vBo+MgV0r0f9k=";
 
         nativeBuildInputs = buildPkgs;
         buildInputs = libPkgs;
 
         postInstall = ''
           mkdir -p $out/share/man/man1
-          scdoc < taiga.1.scd > $out/share/man/man1/taiga.1
+          scdoc < calendar.1.scd > $out/share/man/man1/calendar.1
         '';
       };
 

@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "calendar"
-version = "0.1.0"
+name = "calendar-rs"
+version = "1.0.0"
