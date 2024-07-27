@@ -1,0 +1,18 @@
+[package]
+name = "calendar-rs"
+description = "Cli tool for calendar"
+authors = ["Paul Chambaz <paul.chambaz@tuta.com>"]
+homepage = "https://github.com/paulchambaz/calendar-rs"
+version = "1.0.0"
+edition = "2021"
+include = ["src/**/*", "README.md"]
+license-file = "LICENSE"
+readme = "README.md"
+documentation = "https://docs.rs/taiga-cli"
+keywords = []
+
+[dependencies]
+
+[[bin]]
+name = "calendar"
+path = "src/main.rs"
