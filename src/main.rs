@@ -12,7 +12,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let home_dir = dirs::home_dir().ok_or_else(|| anyhow!("Unable to determine home directory"))?;
     let calendar_dir = home_dir.join(".calendars");
-    fs::create_dir(&calendar_dir)?;
+    fs::create_dir_all(&calendar_dir)?;
 
     match command {
         cli::CalendarCommand::List(args) => {

@@ -40,7 +40,7 @@ pub fn create_personal() -> Result<()> {
 
     let uuid = Uuid::new_v4();
     let uuid_dir = personal_dir.join(uuid.to_string());
-    fs::create_dir(&uuid_dir)?;
+    fs::create_dir_all(&uuid_dir)?;
 
     Ok(())
 }
