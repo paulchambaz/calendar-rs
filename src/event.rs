@@ -1,8 +1,11 @@
 use crate::calendar;
 use crate::cli;
-use anyhow::{anyhow, Context, Result};
-use chrono::{Datelike, Duration, Local, NaiveDate, Timelike};
+use anyhow::{anyhow, Result};
+use chrono::{Datelike, Duration, Local, NaiveDate};
+use colored::Colorize;
 use std::io::Write;
+use std::process::Command;
+use terminal_size::{terminal_size, Width};
 
 pub fn list(cmd: cli::CalendarListArgs) -> Result<()> {
     let mut events = if let Some(calendar_name) = cmd.calendar {
@@ -233,30 +236,268 @@ pub fn delete(cmd: cli::CalendarDeleteArgs) -> Result<()> {
 }
 
 pub fn show(cmd: cli::CalendarShowArgs) -> Result<()> {
-    println!("EventId: {:?}", cmd.event_id);
-    println!("Calendar: {:?}", cmd.calendar);
+    let calendar = calendar::load(&cmd.calendar)?;
 
-    todo!("show event");
+    let event = calendar
+        .get_event(cmd.event_id)
+        .ok_or_else(|| anyhow!("Could not find event with this uuid"))?;
+
+    let date = event.start.format("%A, %d %B");
+    let start_time = event.start.format("%H:%M");
+    let end_time = event.end.format("%H:%M");
+
+    println!("Name: {}", event.name);
+    println!("Date: {}", date);
+    println!("Time: {}-{}", start_time, end_time);
+
+    if let Some(location) = &event.location {
+        println!("Location: {}", location);
+    }
+
+    if let Some(description) = &event.description {
+        println!("Description: {}", description);
+    }
+
+    println!("Id: {}", event.id);
 
     Ok(())
 }
 
 pub fn view(cmd: cli::CalendarViewArgs) -> Result<()> {
-    println!("Date: {:?}", cmd.date);
-    println!("Mode: {:?}", cmd.mode);
-    println!("Calendar: {:?}", cmd.calendar);
+    let mut events = if let Some(calendar_name) = cmd.calendar {
+        let calendar = calendar::load(&calendar_name)?;
+        calendar.events
+    } else {
+        let calendars = calendar::load_all()?;
+        calendars
+            .into_iter()
+            .flat_map(|calendar| calendar.events)
+            .collect()
+    };
 
-    todo!("view event");
+    events.sort_by(|a, b| a.start.cmp(&b.start));
+
+    match cmd.mode {
+        cli::ViewMode::Day => {
+            for i in 0..cmd.number {
+                let target_date = cmd.date + chrono::Duration::days(i.into());
+                let events_for_day: Vec<_> = events
+                    .iter()
+                    .filter(|event| event.start.date() == target_date)
+                    .collect();
+
+                println!("{}", target_date.format("%A, %d %B %Y").to_string().bold());
+
+                for event in events_for_day {
+                    let start_time = event.start.format("%H:%M");
+                    let end_time = event.end.format("%H:%M");
+                    let location_part = event
+                        .location
+                        .as_ref()
+                        .map_or(String::new(), |loc| format!(" in {}", loc));
+
+                    println!(
+                        "{}-{} - {}{}",
+                        start_time, end_time, event.name, location_part
+                    );
+                }
+            }
+        }
+        cli::ViewMode::Week => {
+            for week in 0..cmd.number {
+                let start_of_week = (cmd.date + chrono::Duration::weeks(week.into()))
+                    .week(chrono::Weekday::Mon)
+                    .first_day();
+
+                for day in 0..7 {
+                    let current_date = start_of_week + chrono::Duration::days(day);
+
+                    println!("{}", current_date.format("%A, %d %B").to_string().bold());
+
+                    let events_for_day: Vec<_> = events
+                        .iter()
+                        .filter(|event| event.start.date() == current_date)
+                        .collect();
+
+                    for event in events_for_day {
+                        let start_time = event.start.format("%H:%M");
+                        let end_time = event.end.format("%H:%M");
+                        let location_part = event
+                            .location
+                            .as_ref()
+                            .map_or(String::new(), |loc| format!(" in {}", loc));
+
+                        println!(
+                            "{}-{} - {}{}",
+                            start_time, end_time, event.name, location_part
+                        );
+                    }
+                }
+            }
+        }
+        cli::ViewMode::Month => {
+            // Get terminal width
+            let term_width = terminal_size().map(|(Width(w), _)| w).unwrap_or(80);
+
+            // Calculate the total number of rows for all months
+            let mut total_rows = 0;
+            let mut all_month_dates = Vec::new();
+
+            for month in 0..cmd.number {
+                let target_date = cmd.date + chrono::Months::new(month);
+                let (year, month, _) = (target_date.year(), target_date.month(), target_date.day());
+                let first_of_month = chrono::NaiveDate::from_ymd_opt(year, month, 1).unwrap();
+                let last_of_month = first_of_month + chrono::Months::new(1) - chrono::Days::new(1);
+
+                let mut current_date = first_of_month
+                    - chrono::Days::new(first_of_month.weekday().num_days_from_monday() as u64);
+
+                let mut month_rows = 0;
+                while current_date <= last_of_month {
+                    month_rows += 1;
+                    current_date = current_date + chrono::Days::new(7);
+                }
+
+                total_rows += month_rows + 2; // +2 for month header and weekday header
+                all_month_dates.push((first_of_month, last_of_month, month_rows));
+            }
+
+            // Filter upcoming events for all displayed months
+            let last_displayed_date = all_month_dates.last().unwrap().1;
+
+            let mut line_count = 0;
+
+            let upcoming_events: Vec<_> = events
+                .iter()
+                .filter(|e| e.start.date() >= cmd.date && e.start.date() <= last_displayed_date)
+                .take(total_rows)
+                .collect();
+            let mut upcoming_iter = upcoming_events.iter().peekable();
+
+            // Display each month
+            for (month_index, (first_of_month, _, row_count)) in
+                all_month_dates.into_iter().enumerate()
+            {
+                // Center the month and year
+                let month_year = first_of_month.format("%B %Y").to_string().bold();
+                print!("{:^20} ", month_year);
+                if line_count == 0 {
+                    println!();
+                    line_count = 1;
+                }
+
+                // Print upcoming event for the month header line
+                if line_count >= 2 {
+                    if let Some(event) = upcoming_iter.next() {
+                        print_event(event, term_width);
+                    } else {
+                        println!();
+                    }
+                }
+
+                // Print weekday header and "Coming up:" for the first month only
+                if month_index == 0 {
+                    print!("Mo Tu We Th Fr Sa Su    Coming up:");
+                } else {
+                    print!("Mo Tu We Th Fr Sa Su ");
+                }
+
+                // Print upcoming event for the weekday header line
+                if line_count >= 2 {
+                    if let Some(event) = upcoming_iter.next() {
+                        print_event(event, term_width);
+                    } else {
+                        println!();
+                    }
+                }
+
+                if line_count == 1 {
+                    println!();
+                    line_count = 2;
+                }
+
+                let mut current_date = first_of_month
+                    - chrono::Days::new(first_of_month.weekday().num_days_from_monday() as u64);
+
+                for _week in 0..row_count {
+                    for _weekday in 0..7 {
+                        let day_str = format!("{:2}", current_date.day());
+                        if current_date.month() != first_of_month.month() {
+                            print!("   ");
+                        } else if current_date == chrono::Local::now().date_naive() {
+                            print!("{} ", day_str.on_white().black());
+                        } else if events.iter().any(|e| e.start.date() == current_date) {
+                            print!("{} ", day_str.bold());
+                        } else {
+                            print!("{} ", day_str);
+                        }
+                        current_date = current_date + chrono::Days::new(1);
+                    }
+
+                    // Print upcoming event for this line
+                    if let Some(event) = upcoming_iter.next() {
+                        print_event(event, term_width);
+                    } else {
+                        println!();
+                    }
+                }
+            }
+        }
+    }
 
     Ok(())
 }
 
 pub fn sync(cmd: cli::CalendarSyncArgs) -> Result<()> {
-    println!("Calendar: {:?}", cmd.calendar);
+    let mut vdirsyncer_command = Command::new("vdirsyncer");
+    vdirsyncer_command.arg("sync");
+    vdirsyncer_command.arg("--force-delete");
 
-    todo!("sync event");
+    if let Some(calendar) = cmd.calendar {
+        let _ = calendar::load(&calendar)?;
+
+        vdirsyncer_command.arg(&calendar);
+        println!("Syncing calendar '{}' with vdirsyncer", calendar);
+    } else {
+        println!("Syncing calendars with vdirsyncer");
+    }
+    let output = vdirsyncer_command.output()?;
+
+    if !output.status.success() {
+        return Err(anyhow::anyhow!("vdirsyncer sync failed"));
+    }
 
     Ok(())
+}
+
+fn print_event(event: &calendar::Event, term_width: u16) {
+    print!("   ");
+    let date = event.start.format("%d %b").to_string();
+    let start_time = event.start.format("%H:%M").to_string();
+    let end_time = event.end.format("%H:%M").to_string();
+
+    let location_part = event
+        .location
+        .as_ref()
+        .map_or(String::new(), |loc| format!(" in {}", loc));
+
+    // Format the entire string
+    let formatted_string = format!(
+        "{} {}-{} - {}{}",
+        date, start_time, end_time, event.name, location_part
+    );
+
+    // Calculate available width
+    let available_width = term_width as usize - 22;
+
+    // Truncate the formatted string if necessary
+    let truncated_string = if formatted_string.len() > available_width {
+        format!("{}...", &formatted_string[..available_width - 3])
+    } else {
+        formatted_string
+    };
+
+    println!("{}", truncated_string);
 }
 
 fn fuzzy_match(text: &str, pattern: &str) -> bool {

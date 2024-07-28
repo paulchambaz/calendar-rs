@@ -2,6 +2,7 @@ use crate::calendar::{Calendar, Event};
 use anyhow::{anyhow, Context, Result};
 use chrono::{NaiveDate, NaiveDateTime, Utc};
 use std::fs::{self, File};
+use std::io::Write;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use uuid::Uuid;
@@ -15,13 +16,9 @@ pub fn load_calendars() -> Result<Vec<Calendar>> {
     for entry in fs::read_dir(calendar_dir)? {
         let entry = entry?;
         if entry.file_type()?.is_dir() {
-            let calendar_name = entry.file_name();
             let calendar_path = entry.path();
 
-            calendars.push(read_calendar(
-                &calendar_name.to_string_lossy(),
-                &calendar_path,
-            )?);
+            calendars.push(read_calendar(&calendar_path)?);
         }
     }
 
@@ -36,12 +33,11 @@ pub fn load_calendar(calendar_name: &str) -> Result<Calendar> {
         return Err(anyhow!("Calendar '{}' not found", calendar_name));
     }
 
-    read_calendar(calendar_name, &calendar_path)
+    read_calendar(&calendar_path)
 }
 
-pub fn read_calendar(name: &str, path: &Path) -> Result<Calendar> {
+pub fn read_calendar(path: &Path) -> Result<Calendar> {
     let mut calendar = Calendar {
-        name: name.to_string(),
         path: path.to_path_buf(),
         events: Vec::new(),
     };
@@ -52,6 +48,7 @@ pub fn read_calendar(name: &str, path: &Path) -> Result<Calendar> {
             .context("Failed to get file type")?
             .is_dir()
         {
+            calendar.path = subcalendar.path();
             for entry in fs::read_dir(subcalendar.path()).context("Failed to read subdirectory")? {
                 let entry = entry.context("Failed to read directory entry")?;
                 if entry
@@ -134,39 +131,64 @@ fn parse_datetime(
     let datetime = if value.contains('T') {
         NaiveDateTime::parse_from_str(value, "%Y%m%dT%H%M%S")?
     } else {
-        NaiveDate::parse_from_str(value, "%Y%m%d")?.and_hms(0, 0, 0)
+        NaiveDate::parse_from_str(value, "%Y%m%d")?
+            .and_hms_opt(0, 0, 0)
+            .ok_or_else(|| anyhow::anyhow!("Failed to create NaiveDateTime"))?
     };
 
     Ok((datetime, tz.or_else(|| timezone.clone())))
 }
 
-// pub fn write_event(calendar_path: &Path, event: &Event) -> Result<()> {
-//     let subcalendar_path = calendar_path.join(event.id.to_string());
-//     fs::create_dir_all(&subcalendar_path)?;
-//
-//     let event_path = subcalendar_path.join(format!("{}.ics", event.id));
-//     let ical_event = event.to_ical_event();
-//     let mut ical_calendar = ical::parser::ical::component::IcalCalendar::new();
-//     ical_calendar.events.push(ical_event);
-//
-//     let ical_string = ical::generator::generate_calendar(&ical_calendar)?;
-//     fs::write(event_path, ical_string)?;
-//
-//     Ok(())
-// }
+pub fn write_event(calendar_path: &Path, event: &Event) -> Result<()> {
+    let filename = format!("{}.ics", event.id);
+    let file_path = calendar_path.join(filename);
+    let mut file = File::create(file_path)?;
 
-// pub fn delete_event(calendar_path: &Path, event_id: Uuid) -> Result<()> {
-//     let subcalendar_path = calendar_path.join(event_id.to_string());
-//     let event_path = subcalendar_path.join(format!("{}.ics", event_id));
-//
-//     if event_path.exists() {
-//         fs::remove_file(event_path)?;
-//         // If the subcalendar directory is empty after deleting the event, remove it
-//         if fs::read_dir(&subcalendar_path)?.next().is_none() {
-//             fs::remove_dir(subcalendar_path)?;
-//         }
-//         Ok(())
-//     } else {
-//         Err(anyhow!("Event file not found"))
-//     }
-// }
+    let ics_content = format!(
+        "BEGIN:VCALENDAR\r\n\
+         VERSION:2.0\r\n\
+         PRODID:-//paulchambaz//calendar-rs 1.0.0//EN\r\n\
+         BEGIN:VEVENT\r\n\
+         UID:{}\r\n\
+         DTSTART:{}\r\n\
+         DTEND:{}\r\n\
+         SUMMARY:{}\r\n\
+         {}\
+         {}\
+         BEGIN:VALARM\r\n\
+         ACTION:DISPLAY\r\n\
+         DESCRIPTION:{}\r\n\
+         TRIGGER:-PT10M\r\n\
+         END:VALARM\r\n\
+         END:VEVENT\r\n\
+         END:VCALENDAR\r\n",
+        event.id,
+        event.start.format("%Y%m%dT%H%M%S").to_string(),
+        event.end.format("%Y%m%dT%H%M%S").to_string(),
+        event.name,
+        event
+            .location
+            .as_ref()
+            .map_or(String::new(), |loc| format!("LOCATION:{}\r\n", loc)),
+        event
+            .description
+            .as_ref()
+            .map_or(String::new(), |desc| format!("DESCRIPTION:{}\r\n", desc)),
+        event.name
+    );
+
+    file.write_all(ics_content.as_bytes())?;
+    Ok(())
+}
+
+pub fn delete_event(calendar_path: &Path, event_id: Uuid) -> Result<()> {
+    let filename = format!("{}.ics", event_id);
+    let file_path = calendar_path.join(filename);
+
+    if file_path.exists() {
+        fs::remove_file(&file_path)?;
+        Ok(())
+    } else {
+        Err(anyhow!("Event file not found in the calendar directory"))
+    }
+}

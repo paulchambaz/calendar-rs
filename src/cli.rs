@@ -24,7 +24,7 @@ pub enum Commands {
     Delete(DeleteArgs),
     #[command(about = "Show details of a specific event")]
     Show(ShowArgs),
-    #[command(about = "Display calendar in various formats (upcoming, daily, weekly, monthly)")]
+    #[command(about = "Display calendar in various formats (daily, weekly, monthly)")]
     View(ViewArgs),
     #[command(about = "Synchronize calendars using vdirsyncer")]
     Sync(SyncArgs),
@@ -84,6 +84,7 @@ pub struct CalendarViewArgs {
     pub date: NaiveDate,
     pub mode: ViewMode,
     pub calendar: Option<String>,
+    pub number: u32,
 }
 
 #[derive(Debug)]
@@ -110,7 +111,6 @@ pub enum SearchField {
 
 #[derive(Debug)]
 pub enum ViewMode {
-    Upcoming,
     Day,
     Week,
     Month,
@@ -150,7 +150,6 @@ impl FromStr for ViewMode {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "upcoming" => Ok(ViewMode::Upcoming),
             "day" => Ok(ViewMode::Day),
             "week" => Ok(ViewMode::Week),
             "month" => Ok(ViewMode::Month),
@@ -165,15 +164,23 @@ impl FromStr for ViewMode {
 pub struct ListArgs {
     #[arg(help = "Query terms in the fzf search")]
     pub query: Vec<String>,
-    #[arg(long, help = "Specify the calendar to list (default: all)")]
+    #[arg(short, long, help = "Specify the calendar to list (default: all)")]
     calendar: Option<String>,
-    #[arg(long, help = "Start date for listing (default: today)")]
+    #[arg(short, long, help = "Start date for listing (default: today)")]
     from: Option<String>,
-    #[arg(long, help = "End date for listing (default: 1 month from today)")]
+    #[arg(
+        short,
+        long,
+        help = "End date for listing (default: 1 month from today)"
+    )]
     to: Option<String>,
-    #[arg(long, help = "Limit the number of events shown")]
+    #[arg(short, long, help = "Limit the number of events shown")]
     limit: Option<usize>,
-    #[arg(long, help = "Show the uuid of the tasks for future modification")]
+    #[arg(
+        short,
+        long,
+        help = "Show the uuid of the tasks for future modification"
+    )]
     id: bool,
 }
 
@@ -182,50 +189,70 @@ pub struct AddArgs {
     #[arg(required = true, help = "Name of the event")]
     pub name: Vec<String>,
     #[arg(
+        short,
         long,
         help = "Event start time (eg. tom@21 14-jul@12:30 2024/08/06@08:00)"
     )]
     pub at: String,
-    #[arg(long, help = "Event end time (default: 1 hour after start)")]
+    #[arg(short, long, help = "Event end time (default: 1 hour after start)")]
     pub to: Option<String>,
-    #[arg(long, help = "The calendar to add the event to (default: personal)")]
+    #[arg(
+        short,
+        long,
+        help = "The calendar to add the event to (default: personal)"
+    )]
     pub calendar: Option<String>,
-    #[arg(long, help = "Event location")]
+    #[arg(short, long, help = "Event location")]
     pub loc: Option<String>,
-    #[arg(long, help = "Event description")]
+    #[arg(short, long, help = "Event description")]
     pub desc: Option<String>,
-    #[arg(long, help = "Repeat frequency (daily, weekly, monthly, yearly)")]
+    #[arg(
+        short,
+        long,
+        help = "Repeat frequency (daily, weekly, monthly, yearly)"
+    )]
     pub repeat: Option<String>,
-    #[arg(long, help = "Repeat every N days/weeks/months/years")]
+    #[arg(short, long, help = "Repeat every N days/weeks/months/years")]
     pub every: Option<u32>,
-    #[arg(long, help = "Repeat until this date")]
+    #[arg(short, long, help = "Repeat until this date")]
     pub until: Option<String>,
 }
 
 #[derive(Parser)]
 pub struct EditArgs {
     pub event_id: String,
-    #[arg(long, help = "The calendar to edit the event from (default: personal)")]
+    #[arg(
+        short,
+        long,
+        help = "The calendar to edit the event from (default: personal)"
+    )]
     calendar: Option<String>,
-    #[arg(long, help = "Name of the event")]
+    #[arg(short, long, help = "Name of the event")]
     name: Option<String>,
-    #[arg(long, help = "New event start time")]
+    #[arg(short, long, help = "New event start time")]
     at: Option<String>,
-    #[arg(long, help = "New event end time")]
+    #[arg(short, long, help = "New event end time")]
     to: Option<String>,
-    #[arg(long, help = "New event location")]
+    #[arg(short, long, help = "New event location")]
     loc: Option<String>,
-    #[arg(long, help = "New event description")]
+    #[arg(short, long, help = "New event description")]
     desc: Option<String>,
 }
 
 #[derive(Parser)]
 pub struct DeleteArgs {
     pub event_id: String,
-    #[arg(long, help = "Specify the calendar")]
+    #[arg(short, long, help = "Specify the calendar")]
     calendar: Option<String>,
-    #[arg(long, help = "Delete without confirmation")]
+    #[arg(short, long, help = "Delete without confirmation")]
     force: bool,
+}
+
+#[derive(Parser)]
+pub struct ShowArgs {
+    pub event_id: String,
+    #[arg(short, long, help = "Specify the calendar to show from")]
+    calendar: Option<String>,
 }
 
 #[derive(Parser)]
@@ -233,20 +260,16 @@ pub struct ViewArgs {
     #[arg(help = "Specify the date for which the calendar will be run")]
     pub date: Option<String>,
     #[arg(
+        short,
         long,
-        default_value = "upcoming",
-        help = "View mode: upcoming, day, week, month"
+        default_value = "month",
+        help = "View mode: day, week, month"
     )]
     mode: String,
-    #[arg(long, help = "Specify the calendar to view")]
+    #[arg(short, long, help = "Specify the calendar to view")]
     calendar: Option<String>,
-}
-
-#[derive(Parser)]
-pub struct ShowArgs {
-    pub event_id: String,
-    #[arg(long, help = "Specify the calendar to show from")]
-    calendar: Option<String>,
+    #[arg(short, long, help = "Show n times")]
+    number: Option<u32>,
 }
 
 #[derive(Parser)]
@@ -404,10 +427,13 @@ impl ViewArgs {
             .unwrap_or_else(|| chrono::Local::now().naive_local().date());
         let mode = ViewMode::from_str(&self.mode)?;
 
+        let number = self.number.unwrap_or(1);
+
         Ok(CalendarViewArgs {
             date,
             mode,
             calendar: self.calendar,
+            number,
         })
     }
 }
@@ -433,8 +459,9 @@ pub fn parse_cli() -> Result<CalendarCommand> {
 
     match cli.command.unwrap_or(Commands::View(ViewArgs {
         date: None,
-        mode: "upcoming".to_string(),
+        mode: "month".to_string(),
         calendar: None,
+        number: None,
     })) {
         Commands::List(args) => args.validate().map(CalendarCommand::List),
         Commands::Add(args) => args.validate().map(CalendarCommand::Add),
@@ -451,7 +478,7 @@ pub enum CalendarCommand {
     Add(CalendarAddArgs),
     Edit(CalendarEditArgs),
     Delete(CalendarDeleteArgs),
-    View(CalendarViewArgs),
     Show(CalendarShowArgs),
+    View(CalendarViewArgs),
     Sync(CalendarSyncArgs),
 }

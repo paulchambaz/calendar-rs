@@ -1,9 +1,5 @@
 use anyhow::{anyhow, Result};
-use chrono::{Duration, Local, NaiveDate, NaiveDateTime};
-use ical::parser::ical::component::{IcalCalendar, IcalEvent};
-use ical::property::Property;
-use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
+use chrono::NaiveDateTime;
 use std::path::PathBuf;
 use uuid::Uuid;
 
@@ -11,7 +7,6 @@ use crate::storage;
 
 #[derive(Debug, Clone)]
 pub struct Calendar {
-    pub name: String,
     pub path: PathBuf,
     pub events: Vec<Event>,
 }
@@ -44,18 +39,19 @@ impl Calendar {
         description: Option<String>,
     ) -> Result<()> {
         let event = Event::new(name, start, end, location, description);
-        self.events.push(event);
 
-        todo!("write event to disk");
+        storage::write_event(&self.path, &event)?;
+
         Ok(())
     }
 
     pub fn remove_event(&mut self, event_id: Uuid) -> Result<()> {
-        let event = self
+        let _ = self
             .get_event(event_id)
             .ok_or_else(|| anyhow!("Could not find event with this uuid"))?;
 
-        todo!("delete event from disk");
+        storage::delete_event(&self.path, event_id)?;
+
         Ok(())
     }
 
@@ -68,6 +64,8 @@ impl Calendar {
         location: Option<String>,
         description: Option<String>,
     ) -> Result<()> {
+        let path = self.path.clone();
+
         let event = self
             .get_event_mut(id)
             .ok_or_else(|| anyhow!("Could not find event with this uuid"))?;
@@ -87,7 +85,8 @@ impl Calendar {
             event.description = Some(new_description);
         }
 
-        todo!("write event to disk");
+        storage::write_event(&path, &event)?;
+
         Ok(())
     }
 
@@ -116,101 +115,5 @@ impl Event {
             location,
             description,
         }
-    }
-
-    pub fn from_ical_event(event: IcalEvent) -> Result<Self> {
-        let id = event
-            .properties
-            .iter()
-            .find(|p| p.name == "UID")
-            .and_then(|p| p.value.as_ref())
-            .and_then(|v| Uuid::parse_str(v).ok())
-            .ok_or_else(|| anyhow!("Event is missing UID"))?;
-
-        let summary = event
-            .properties
-            .iter()
-            .find(|p| p.name == "SUMMARY")
-            .and_then(|p| p.value.as_ref())
-            .ok_or_else(|| anyhow!("Event is missing SUMMARY"))?
-            .to_string();
-
-        let start = event
-            .properties
-            .iter()
-            .find(|p| p.name == "DTSTART")
-            .and_then(|p| p.value.as_ref())
-            .and_then(|v| NaiveDateTime::parse_from_str(v, "%Y%m%dT%H%M%S").ok())
-            .ok_or_else(|| anyhow!("Event is missing or has invalid DTSTART"))?;
-
-        let end = event
-            .properties
-            .iter()
-            .find(|p| p.name == "DTEND")
-            .and_then(|p| p.value.as_ref())
-            .and_then(|v| NaiveDateTime::parse_from_str(v, "%Y%m%dT%H%M%S").ok())
-            .ok_or_else(|| anyhow!("Event is missing or has invalid DTEND"))?;
-
-        let location = event
-            .properties
-            .iter()
-            .find(|p| p.name == "LOCATION")
-            .and_then(|p| p.value.as_ref())
-            .map(|v| v.to_string());
-
-        let description = event
-            .properties
-            .iter()
-            .find(|p| p.name == "DESCRIPTION")
-            .and_then(|p| p.value.as_ref())
-            .map(|v| v.to_string());
-
-        Ok(Event {
-            id,
-            name: summary,
-            start,
-            end,
-            location,
-            description,
-        })
-    }
-
-    pub fn to_ical_event(&self) -> IcalEvent {
-        let mut event = IcalEvent::new();
-        event.properties.push(Property {
-            name: "UID".to_string(),
-            params: None,
-            value: Some(self.id.to_string()),
-        });
-        event.properties.push(Property {
-            name: "SUMMARY".to_string(),
-            params: None,
-            value: Some(self.name.clone()),
-        });
-        event.properties.push(Property {
-            name: "DTSTART".to_string(),
-            params: None,
-            value: Some(self.start.format("%Y%m%dT%H%M%S").to_string()),
-        });
-        event.properties.push(Property {
-            name: "DTEND".to_string(),
-            params: None,
-            value: Some(self.end.format("%Y%m%dT%H%M%S").to_string()),
-        });
-        if let Some(location) = &self.location {
-            event.properties.push(Property {
-                name: "LOCATION".to_string(),
-                params: None,
-                value: Some(location.clone()),
-            });
-        }
-        if let Some(description) = &self.description {
-            event.properties.push(Property {
-                name: "DESCRIPTION".to_string(),
-                params: None,
-                value: Some(description.clone()),
-            });
-        }
-        event
     }
 }
