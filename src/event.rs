@@ -1,5 +1,6 @@
 use crate::calendar;
 use crate::cli;
+use crate::storage;
 use anyhow::{anyhow, Result};
 use chrono::{Datelike, Duration, Local, NaiveDate, Timelike};
 use colored::Colorize;
@@ -72,6 +73,13 @@ pub fn list(cmd: cli::CalendarListArgs) -> Result<()> {
 }
 
 pub fn add(cmd: cli::CalendarAddArgs) -> Result<()> {
+    let calendars = storage::list_calendars()?;
+
+    if !calendars.contains(&"personal".to_string()) {
+        println!("No personal calendar found. Creating it...");
+        storage::create_personal()?;
+    }
+
     let mut calendar = calendar::load(&cmd.calendar)?;
 
     if let Some(repeat) = cmd.repeat {

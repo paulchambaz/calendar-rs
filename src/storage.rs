@@ -7,6 +7,44 @@ use std::io::{BufRead, BufReader};
 use std::path::Path;
 use uuid::Uuid;
 
+pub fn list_calendars() -> Result<Vec<String>> {
+    let home_dir = dirs::home_dir().ok_or_else(|| anyhow!("Unable to determine home directory"))?;
+    let calendar_dir = home_dir.join(".calendars");
+    let mut valid_calendars = Vec::new();
+
+    for entry in fs::read_dir(calendar_dir)? {
+        let entry = entry?;
+        if entry.file_type()?.is_dir() {
+            let calendar_path = entry.path();
+            // Check if this directory contains at least one subdirectory
+            if fs::read_dir(&calendar_path)?
+                .filter_map(Result::ok)
+                .any(|e| e.file_type().map(|ft| ft.is_dir()).unwrap_or(false))
+            {
+                if let Some(name) = calendar_path.file_name() {
+                    if let Some(name_str) = name.to_str() {
+                        valid_calendars.push(name_str.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(valid_calendars)
+}
+
+pub fn create_personal() -> Result<()> {
+    let home_dir = dirs::home_dir().ok_or_else(|| anyhow!("Unable to determine home directory"))?;
+    let personal_dir = home_dir.join(".calendars").join("personal");
+    fs::create_dir_all(&personal_dir)?;
+
+    let uuid = Uuid::new_v4();
+    let uuid_dir = personal_dir.join(uuid.to_string());
+    fs::create_dir(&uuid_dir)?;
+
+    Ok(())
+}
+
 pub fn load_calendars() -> Result<Vec<Calendar>> {
     let home_dir = dirs::home_dir().ok_or_else(|| anyhow!("Unable to determine home directory"))?;
     let calendar_dir = home_dir.join(".calendars");

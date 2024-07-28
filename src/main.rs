@@ -7,6 +7,8 @@ mod storage;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let command = cli::parse_cli()?;
 
+    // check if .personal exists
+
     match command {
         cli::CalendarCommand::List(args) => {
             event::list(args)?;
