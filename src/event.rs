@@ -204,10 +204,6 @@ pub fn edit(cmd: cli::CalendarEditArgs) -> Result<()> {
         cmd.desc,
     )?;
 
-    for event in calendar.events {
-        println!("{:?}", event);
-    }
-
     Ok(())
 }
 

@@ -157,7 +157,6 @@ pub fn write_event(calendar_path: &Path, event: &Event) -> Result<()> {
          {}\
          BEGIN:VALARM\r\n\
          ACTION:DISPLAY\r\n\
-         DESCRIPTION:{}\r\n\
          TRIGGER:-PT10M\r\n\
          END:VALARM\r\n\
          END:VEVENT\r\n\
@@ -174,7 +173,6 @@ pub fn write_event(calendar_path: &Path, event: &Event) -> Result<()> {
             .description
             .as_ref()
             .map_or(String::new(), |desc| format!("DESCRIPTION:{}\r\n", desc)),
-        event.name
     );
 
     file.write_all(ics_content.as_bytes())?;
