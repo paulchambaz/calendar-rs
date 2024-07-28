@@ -1,4 +1,4 @@
-CALENDAR(1) "https://github.com/username/calendar-rs" "General Commands Manual"
+CALENDAR(1) "https://github.com/paulchambaz/calendar-rs" "General Commands Manual"
 
 # NAME
 
