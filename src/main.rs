@@ -3,11 +3,16 @@ mod cli;
 mod date;
 mod event;
 mod storage;
+use std::fs;
+
+use anyhow::{anyhow, Result};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let command = cli::parse_cli()?;
 
-    // check if .personal exists
+    let home_dir = dirs::home_dir().ok_or_else(|| anyhow!("Unable to determine home directory"))?;
+    let calendar_dir = home_dir.join(".calendars");
+    fs::create_dir(&calendar_dir)?;
 
     match command {
         cli::CalendarCommand::List(args) => {
