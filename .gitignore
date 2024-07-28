@@ -1,7 +1,22 @@
+# Rust build artifacts
 /target
-/result
-/.direnv
-/.direnv/**
 *.profraw
 tarpaulin*
+
+# Nix-specific
+/result
+/.direnv
+
+# Misc
 *.bin
+
+# Flake inputs (adjust the pattern if needed)
+.direnv/flake-inputs/**
+
+# Specific directories mentioned in the error
+.direnv/flake-inputs/xblysc3prg1zqsi59fr36nj6wdiqryzp-source/**
+.direnv/flake-inputs/yj1wxm9hh8610iyzqnz75kvs6xl8j3my-source/**
+.direnv/flake-inputs/na7sykizsgkzh9i3wc8m8pz5xfqib2rv-source/**
+
+# Ignore all README.md files in the flake inputs
+.direnv/flake-inputs/**/README.md
