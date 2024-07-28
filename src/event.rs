@@ -210,6 +210,13 @@ pub fn add(cmd: cli::CalendarAddArgs) -> Result<()> {
 }
 
 pub fn edit(cmd: cli::CalendarEditArgs) -> Result<()> {
+    let calendars = storage::list_calendars()?;
+
+    if !calendars.contains(&"personal".to_string()) {
+        println!("No personal calendar found. Creating it...");
+        storage::create_personal()?;
+    }
+
     let mut calendar = calendar::load(&cmd.calendar)?;
     calendar.edit_event(
         cmd.event_id,
@@ -224,6 +231,13 @@ pub fn edit(cmd: cli::CalendarEditArgs) -> Result<()> {
 }
 
 pub fn delete(cmd: cli::CalendarDeleteArgs) -> Result<()> {
+    let calendars = storage::list_calendars()?;
+
+    if !calendars.contains(&"personal".to_string()) {
+        println!("No personal calendar found. Creating it...");
+        storage::create_personal()?;
+    }
+
     let mut calendar = calendar::load(&cmd.calendar)?;
 
     if !cmd.force {
