@@ -2,18 +2,21 @@ use anyhow::{anyhow, Result};
 use chrono::{Duration, Local, NaiveDate, NaiveDateTime};
 use ical::parser::ical::component::{IcalCalendar, IcalEvent};
 use ical::property::Property;
-use rand::Rng;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use uuid::Uuid;
 
+use crate::storage;
+
+#[derive(Debug, Clone)]
 pub struct Calendar {
     pub name: String,
     pub path: PathBuf,
     pub events: Vec<Event>,
 }
 
+#[derive(Debug, Clone)]
 pub struct Event {
     pub id: Uuid,
     pub name: String,
@@ -23,112 +26,68 @@ pub struct Event {
     pub description: Option<String>,
 }
 
-pub fn generate_random_events(count: usize) -> Vec<Event> {
-    let mut rng = rand::thread_rng();
-    let now = Local::now().naive_local();
+pub fn load_all() -> Result<Vec<Calendar>> {
+    storage::load_calendars()
+}
 
-    let event_names = vec![
-        "Team Meeting",
-        "Project Deadline",
-        "Client Call",
-        "Lunch Break",
-        "Code Review",
-        "Gym Session",
-        "Doctor's Appointment",
-        "Birthday Party",
-        "Conference Call",
-        "Presentation Prep",
-    ];
-
-    let locations = vec![
-        "Office",
-        "Home",
-        "Coffee Shop",
-        "Conference Room",
-        "Gym",
-        "Doctor's Office",
-        "Restaurant",
-        "Park",
-        "Client's Office",
-    ];
-
-    (0..count)
-        .map(|_| {
-            let days_offset = rng.gen_range(-30..30);
-            let hours_offset = rng.gen_range(0..24);
-            let start = now + Duration::days(days_offset) + Duration::hours(hours_offset);
-            let duration = Duration::hours(rng.gen_range(1..4));
-            let end = start + duration;
-
-            Event {
-                id: Uuid::new_v4(),
-                name: event_names[rng.gen_range(0..event_names.len())].to_string(),
-                start,
-                end,
-                location: if rng.gen_bool(0.7) {
-                    Some(locations[rng.gen_range(0..locations.len())].to_string())
-                } else {
-                    None
-                },
-                description: if rng.gen_bool(0.5) {
-                    Some(format!(
-                        "Random description for event {}",
-                        rng.gen_range(1..100)
-                    ))
-                } else {
-                    None
-                },
-            }
-        })
-        .collect()
+pub fn load(name: &str) -> Result<Calendar> {
+    storage::load_calendar(name)
 }
 
 impl Calendar {
-    pub fn new(name: String, path: PathBuf) -> Result<Self> {
-        let mut calendar = Calendar {
-            name,
-            path,
-            events: Vec::new(),
-        };
-        calendar.load()?;
-        Ok(calendar)
-    }
-
-    fn load(&mut self) -> Result<()> {
-        let mut file = File::open(&self.path)?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
-
-        let ical = ical::IcalParser::new(contents.as_bytes())
-            .next()
-            .ok_or_else(|| anyhow!("Failed to parse calendar file"))??;
-
-        self.events = ical
-            .events
-            .into_iter()
-            .filter_map(|e| Event::from_ical_event(e).ok())
-            .collect();
-
-        Ok(())
-    }
-
-    pub fn add_event(&mut self, event: Event) -> Result<()> {
+    pub fn add_event(
+        &mut self,
+        name: String,
+        start: NaiveDateTime,
+        end: NaiveDateTime,
+        location: Option<String>,
+        description: Option<String>,
+    ) -> Result<()> {
+        let event = Event::new(name, start, end, location, description);
         self.events.push(event);
-        // self.save();
+
+        todo!("write event to disk");
         Ok(())
     }
 
-    pub fn remove_event(&mut self, id: Uuid) -> Result<()> {
-        self.events.retain(|e| e.id != id);
-        // self.save();
+    pub fn remove_event(&mut self, event_id: Uuid) -> Result<()> {
+        let event = self
+            .get_event(event_id)
+            .ok_or_else(|| anyhow!("Could not find event with this uuid"))?;
+
+        todo!("delete event from disk");
         Ok(())
     }
 
-    pub fn edit_event(&mut self, id: Uuid, new_event: Event) -> Result<()> {
-        if let Some(event) = self.events.iter_mut().find(|e| e.id == id) {
-            *event = new_event;
-            // self.save()?;
+    pub fn edit_event(
+        &mut self,
+        id: Uuid,
+        name: Option<String>,
+        start: Option<NaiveDateTime>,
+        end: Option<NaiveDateTime>,
+        location: Option<String>,
+        description: Option<String>,
+    ) -> Result<()> {
+        let event = self
+            .get_event_mut(id)
+            .ok_or_else(|| anyhow!("Could not find event with this uuid"))?;
+        if let Some(new_name) = name {
+            event.name = new_name;
         }
+        if let Some(new_start) = start {
+            event.start = new_start;
+        }
+        if let Some(new_end) = end {
+            event.end = new_end;
+        }
+        if let Some(new_location) = location {
+            event.location = Some(new_location);
+        }
+        if let Some(new_description) = description {
+            event.description = Some(new_description);
+        }
+
+        todo!("write event to disk");
         Ok(())
     }
 
@@ -136,41 +95,14 @@ impl Calendar {
         self.events.iter().find(|e| e.id == id)
     }
 
-    pub fn list_events(&self, from: NaiveDate, to: NaiveDate) -> Vec<&Event> {
-        self.events
-            .iter()
-            .filter(|e| e.start.date() >= from && e.end.date() <= to)
-            .collect()
+    fn get_event_mut(&mut self, id: Uuid) -> Option<&mut Event> {
+        self.events.iter_mut().find(|e| e.id == id)
     }
-
-    // fn save(&self) -> Result<()> {
-    //     let mut ical = IcalCalendar::new();
-    //     ical.properties.push(Property {
-    //         name: "VERSION".to_string(),
-    //         params: None,
-    //         value: Some("2.0".to_string()),
-    //     });
-    //
-    //     for event in &self.events {
-    //         ical.events.push(event.to_ical_event());
-    //     }
-    //
-    //     let ical_string = ical::write_calendar(&ical)
-    //         .map_err(|e| anyhow!("Failed to serialize calendar: {}", e))?;
-    //
-    //     let mut file = OpenOptions::new()
-    //         .write(true)
-    //         .truncate(true)
-    //         .open(&self.path)?;
-    //
-    //     file.write_all(ical_string.as_bytes())?;
-    //     Ok(())
-    // }
 }
 
 impl Event {
     pub fn new(
-        summary: String,
+        name: String,
         start: NaiveDateTime,
         end: NaiveDateTime,
         location: Option<String>,
@@ -178,7 +110,7 @@ impl Event {
     ) -> Self {
         Event {
             id: Uuid::new_v4(),
-            name: summary,
+            name,
             start,
             end,
             location,
@@ -186,7 +118,7 @@ impl Event {
         }
     }
 
-    fn from_ical_event(event: IcalEvent) -> Result<Self> {
+    pub fn from_ical_event(event: IcalEvent) -> Result<Self> {
         let id = event
             .properties
             .iter()
@@ -243,7 +175,7 @@ impl Event {
         })
     }
 
-    fn to_ical_event(&self) -> IcalEvent {
+    pub fn to_ical_event(&self) -> IcalEvent {
         let mut event = IcalEvent::new();
         event.properties.push(Property {
             name: "UID".to_string(),

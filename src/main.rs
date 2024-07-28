@@ -2,53 +2,32 @@ mod calendar;
 mod cli;
 mod date;
 mod event;
+mod storage;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let command = cli::parse_cli()?;
 
     match command {
         cli::CalendarCommand::List(args) => {
-            event::list(args);
+            event::list(args)?;
         }
         cli::CalendarCommand::Add(args) => {
-            println!("Calendar: {:?}", args.calendar);
-            println!("Name: {:?}", args.name);
-            println!("Start: {:?}", args.start);
-            println!("End: {:?}", args.end);
-            println!("Loc: {:?}", args.loc);
-            println!("Desc: {:?}", args.desc);
-            println!("Repeat: {:?}", args.repeat);
-            println!("Every: {:?}", args.every);
-            println!("Until: {:?}", args.until);
+            event::add(args)?;
         }
         cli::CalendarCommand::Edit(args) => {
-            println!("EventId: {:?}", args.event_id);
-            println!("Calendar: {:?}", args.calendar);
-            println!("Name: {:?}", args.name);
-            println!("Start: {:?}", args.start);
-            println!("End: {:?}", args.end);
-            println!("Loc: {:?}", args.loc);
-            println!("Desc: {:?}", args.desc);
-            println!("Repeat: {:?}", args.repeat);
-            println!("Every: {:?}", args.every);
-            println!("Until: {:?}", args.until);
+            event::edit(args)?;
         }
         cli::CalendarCommand::Delete(args) => {
-            println!("EventId: {:?}", args.event_id);
-            println!("Calendar: {:?}", args.calendar);
-            println!("Force: {:?}", args.force);
+            event::delete(args)?;
         }
         cli::CalendarCommand::Show(args) => {
-            println!("EventId: {:?}", args.event_id);
-            println!("Calendar: {:?}", args.calendar);
+            event::show(args)?;
         }
         cli::CalendarCommand::View(args) => {
-            println!("Date: {:?}", args.date);
-            println!("Mode: {:?}", args.mode);
-            println!("Calendar: {:?}", args.calendar);
+            event::view(args)?;
         }
         cli::CalendarCommand::Sync(args) => {
-            println!("Calendar: {:?}", args.calendar);
+            event::sync(args)?;
         }
     }
 

@@ -12,7 +12,7 @@ lazy_static! {
     static ref SHORT_DATE_REGEX: Regex = Regex::new(r"^(\d{1,2})-(\d{1,2})$").unwrap();
     static ref TIME_REGEX: Regex = Regex::new(r"^(\d{1,2}):(\d{2})(?::(\d{2}))?$").unwrap();
     static ref RELATIVE_DATE_REGEX: Regex =
-        Regex::new(r"^(today|tomorrow|(\d+)([dwmy]))$").unwrap();
+        Regex::new(r"^(yesterday|yes|today|tomorrow|tom|(\d+)([dwmy]))$").unwrap();
     static ref WEEKDAY_REGEX: Regex = Regex::new(
         r"^(monday|mon|tuesday|tue|wednesday|wed|thursday|thu|friday|fri|saturday|sat|sunday|sun)$"
     )
@@ -77,8 +77,11 @@ impl FromStr for CalendarDate {
 
         if let Some(caps) = RELATIVE_DATE_REGEX.captures(date_str) {
             return match &caps[1] {
+                "yesterday" => Ok(CalendarDate(today - Duration::days(1))),
+                "yes" => Ok(CalendarDate(today - Duration::days(1))),
                 "today" => Ok(CalendarDate(today)),
                 "tomorrow" => Ok(CalendarDate(today + Duration::days(1))),
+                "tom" => Ok(CalendarDate(today + Duration::days(1))),
                 _ => {
                     let amount: i64 = caps[2].parse()?;
                     match &caps[3] {

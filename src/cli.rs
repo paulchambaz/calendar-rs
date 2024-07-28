@@ -64,9 +64,6 @@ pub struct CalendarEditArgs {
     pub end: Option<NaiveDateTime>,
     pub loc: Option<String>,
     pub desc: Option<String>,
-    pub repeat: Option<RepeatFrequency>,
-    pub every: Option<u32>,
-    pub until: Option<NaiveDate>,
 }
 
 #[derive(Debug)]
@@ -220,12 +217,6 @@ pub struct EditArgs {
     loc: Option<String>,
     #[arg(long, help = "New event description")]
     desc: Option<String>,
-    #[arg(long, help = "New repeat frequency")]
-    repeat: Option<String>,
-    #[arg(long, help = "New repeat interval")]
-    every: Option<u32>,
-    #[arg(long, help = "New repeat end date")]
-    until: Option<String>,
 }
 
 #[derive(Parser)]
@@ -380,27 +371,6 @@ impl EditArgs {
             }
         }
 
-        let repeat = self
-            .repeat
-            .map(|r| RepeatFrequency::from_str(&r))
-            .transpose()?;
-        let until = self.until.map(|u| parse_date(&u)).transpose()?;
-
-        let every = if repeat.is_some() {
-            Some(self.every.unwrap_or(1))
-        } else {
-            None
-        };
-
-        if repeat.is_none() {
-            if self.every.is_some() {
-                return Err(anyhow!("'repeat' must be specified when using 'every'"));
-            }
-            if until.is_some() {
-                return Err(anyhow!("'repeat' must be specified when using 'until'"));
-            }
-        }
-
         Ok(CalendarEditArgs {
             event_id,
             calendar,
@@ -409,9 +379,6 @@ impl EditArgs {
             end,
             loc: self.loc,
             desc: self.desc,
-            repeat,
-            every,
-            until,
         })
     }
 }
