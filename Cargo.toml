@@ -8,7 +8,7 @@ edition = "2021"
 include = ["src/**/*", "README.md"]
 license-file = "LICENSE"
 readme = "README.md"
-documentation = "https://docs.rs/taiga-cli"
+documentation = "https://docs.rs/calendar-rs"
 keywords = []
 
 [dependencies]
