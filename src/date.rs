@@ -8,6 +8,8 @@ use std::str::FromStr;
 lazy_static! {
     static ref DAY_MONTH_REGEX: Regex = Regex::new(r"^(\d{1,2})[-/]([a-zA-Z]+)$").unwrap();
     static ref MONTH_DAY_REGEX: Regex = Regex::new(r"^([a-zA-Z]+)[-/](\d{1,2})$").unwrap();
+    static ref MONTH_YEAR_REGEX: Regex = Regex::new(r"^([a-zA-Z]+)[-/](\d{4})$").unwrap();
+    static ref YEAR_MONTH_REGEX: Regex = Regex::new(r"^(\d{4})[-/]([a-zA-Z]+)$").unwrap();
     static ref DATE_REGEX_YMD: Regex = Regex::new(r"^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$").unwrap();
     static ref DATE_REGEX_DMY: Regex = Regex::new(r"^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$").unwrap();
     static ref SHORT_DATE_REGEX: Regex = Regex::new(r"^(\d{1,2})[-/](\d{1,2})$").unwrap();
@@ -127,28 +129,70 @@ impl FromStr for CalendarDate {
         }
 
         if let Some(month) = MONTH_MAP.get(date_str.to_lowercase().as_str()) {
-            return NaiveDate::from_ymd_opt(today.year(), *month, 1)
+            let mut year = today.year();
+            if today.month() > *month {
+                year += 1;
+            }
+            return NaiveDate::from_ymd_opt(year, *month, 1)
                 .map(CalendarDate)
                 .ok_or_else(|| anyhow!("Invalid month"));
+        }
+
+        if let Some(caps) = MONTH_YEAR_REGEX.captures(date_str) {
+            let month = parse_month(&caps[1])?;
+            let year: i32 = caps[2].parse()?;
+            return NaiveDate::from_ymd_opt(year, month, 1)
+                .map(CalendarDate)
+                .ok_or_else(|| anyhow!("Invalid month-year combination"));
+        }
+
+        if let Some(caps) = YEAR_MONTH_REGEX.captures(date_str) {
+            let year: i32 = caps[1].parse()?;
+            let month = parse_month(&caps[2])?;
+            return NaiveDate::from_ymd_opt(year, month, 1)
+                .map(CalendarDate)
+                .ok_or_else(|| anyhow!("Invalid year-month combination"));
         }
 
         if let Some(caps) = DAY_MONTH_REGEX.captures(date_str) {
             let day: u32 = caps[1].parse()?;
             let month = parse_month(&caps[2])?;
-            return NaiveDate::from_ymd_opt(today.year(), month, day)
-                .map(CalendarDate)
-                .ok_or_else(|| anyhow!("Invalid date"));
+            return get_next_occurrence(today, month, day);
         }
 
         if let Some(caps) = MONTH_DAY_REGEX.captures(date_str) {
             let month = parse_month(&caps[1])?;
             let day: u32 = caps[2].parse()?;
-            return NaiveDate::from_ymd_opt(today.year(), month, day)
-                .map(CalendarDate)
-                .ok_or_else(|| anyhow!("Invalid date"));
+            return get_next_occurrence(today, month, day);
         }
 
         Err(anyhow!("Unrecognized date format"))
+    }
+}
+
+fn get_next_occurrence(
+    today: NaiveDate,
+    month: u32,
+    day: u32,
+) -> Result<CalendarDate, anyhow::Error> {
+    let this_year = today.year();
+    let next_year = this_year + 1;
+
+    // Try this year first
+    if let Some(date) = NaiveDate::from_ymd_opt(this_year, month, day) {
+        if date >= today {
+            return Ok(CalendarDate(date));
+        }
+    }
+
+    // If this year's date has passed or doesn't exist, try next year
+    if let Some(date) = NaiveDate::from_ymd_opt(next_year, month, day) {
+        Ok(CalendarDate(date))
+    } else {
+        // If the date doesn't exist in either year (e.g., February 30th)
+        Err(anyhow!(
+            "Invalid date: the specified day does not exist for this month"
+        ))
     }
 }
 
