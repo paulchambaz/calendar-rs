@@ -6,10 +6,11 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 lazy_static! {
-    static ref DAY_MONTH_REGEX: Regex = Regex::new(r"^(\d{1,2})-([a-zA-Z]+)$").unwrap();
-    static ref MONTH_DAY_REGEX: Regex = Regex::new(r"^([a-zA-Z]+)-(\d{1,2})$").unwrap();
-    static ref DATE_REGEX: Regex = Regex::new(r"^(\d{4})-(\d{1,2})-(\d{1,2})$").unwrap();
-    static ref SHORT_DATE_REGEX: Regex = Regex::new(r"^(\d{1,2})-(\d{1,2})$").unwrap();
+    static ref DAY_MONTH_REGEX: Regex = Regex::new(r"^(\d{1,2})[-/]([a-zA-Z]+)$").unwrap();
+    static ref MONTH_DAY_REGEX: Regex = Regex::new(r"^([a-zA-Z]+)[-/](\d{1,2})$").unwrap();
+    static ref DATE_REGEX_YMD: Regex = Regex::new(r"^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$").unwrap();
+    static ref DATE_REGEX_DMY: Regex = Regex::new(r"^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$").unwrap();
+    static ref SHORT_DATE_REGEX: Regex = Regex::new(r"^(\d{1,2})[-/](\d{1,2})$").unwrap();
     static ref TIME_REGEX: Regex = Regex::new(r"^(\d{1,2}):(\d{2})(?::(\d{2}))?$").unwrap();
     static ref RELATIVE_DATE_REGEX: Regex =
         Regex::new(r"^(yesterday|yes|today|tomorrow|tom|(\d+)([dwmy]))$").unwrap();
@@ -61,15 +62,21 @@ impl FromStr for CalendarDate {
     fn from_str(date_str: &str) -> Result<Self, Self::Err> {
         let today = Local::now().naive_local().date();
 
-        if let Some(caps) = DATE_REGEX.captures(date_str) {
+        if let Some(caps) = DATE_REGEX_YMD.captures(date_str) {
             return NaiveDate::from_ymd_opt(caps[1].parse()?, caps[2].parse()?, caps[3].parse()?)
                 .map(CalendarDate)
                 .ok_or_else(|| anyhow!("Invalid date"));
         }
 
+        if let Some(caps) = DATE_REGEX_DMY.captures(date_str) {
+            return NaiveDate::from_ymd_opt(caps[3].parse()?, caps[2].parse()?, caps[1].parse()?)
+                .map(CalendarDate)
+                .ok_or_else(|| anyhow!("Invalid date"));
+        }
+
         if let Some(caps) = SHORT_DATE_REGEX.captures(date_str) {
-            let month: u32 = caps[1].parse()?;
-            let day: u32 = caps[2].parse()?;
+            let day: u32 = caps[1].parse()?;
+            let month: u32 = caps[2].parse()?;
             return NaiveDate::from_ymd_opt(today.year(), month, day)
                 .map(CalendarDate)
                 .ok_or_else(|| anyhow!("Invalid date"));

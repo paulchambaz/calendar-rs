@@ -187,12 +187,12 @@ Synchronize calendars using vdirsyncer.
 *calendar-rs* supports various date and time formats for flexible input:
 
 1. Full date: YYYY-MM-DD, DD-MM-YYYY, YYYY/MM/DD, DD/MM/YYYY (e.g., 2023-07-28)
-2. Short date: MM-DD (e.g., 07-28)
+2. Short date: DD-MM, DD/MM (e.g., 28-07, 2/9)
 3. Relative date: yesterday, yes, today, tomorrow, tom, Nd, Nw, Nm, Ny (e.g., 3d for 3 days from today)
 4. Weekday: monday, mon, tuesday, tue, etc.
 5. Month name: january, jan, february, feb, etc.
-6. Day-Month: DD-MMM (e.g., 28-Jul)
-7. Month-Day: MMM-DD (e.g., Jul-28)
+6. Day-Month: DD-MMM, DD/MMM (e.g., 28-jul, 2-sep)
+7. Month-Day: MMM-DD, MMM/DD (e.g., jul-28, sep-2)
 8. Time: HH:MM[:SS] or single-digit hour (e.g., 14:30, 14:30:00, 2)
 9. DateTime: any supported date format followed by '@' and a time format (e.g., tom@14:30, 2023-07-28@9)
 
