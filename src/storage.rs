@@ -185,7 +185,7 @@ pub fn write_event(calendar_path: &Path, event: &Event) -> Result<()> {
     let ics_content = format!(
         "BEGIN:VCALENDAR\r\n\
          VERSION:2.0\r\n\
-         PRODID:-//paulchambaz//calendar-rs 1.0.0//EN\r\n\
+         PRODID:-//paulchambaz//calendar-rs 1.0.1//EN\r\n\
          BEGIN:VEVENT\r\n\
          UID:{}\r\n\
          DTSTART:{}\r\n\
