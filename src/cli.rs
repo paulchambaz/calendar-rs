@@ -10,6 +10,18 @@ use uuid::Uuid;
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
+
+    #[arg(
+        short,
+        long,
+        default_value = "month",
+        help = "View mode: day, week, month"
+    )]
+    mode: Option<String>,
+    #[arg(short, long, help = "Specify the calendar to view")]
+    calendar: Option<String>,
+    #[arg(short, long, help = "Show n times")]
+    number: Option<u32>,
 }
 
 #[derive(Subcommand)]
@@ -457,11 +469,17 @@ impl SyncArgs {
 pub fn parse_cli() -> Result<CalendarCommand> {
     let cli = Cli::parse();
 
+    if (cli.mode.is_some() || cli.calendar.is_some() || cli.number.is_some())
+        && cli.command.is_some()
+    {
+        return Err(anyhow!("Cannot use command and view arguments"));
+    }
+
     match cli.command.unwrap_or(Commands::View(ViewArgs {
         date: None,
-        mode: "month".to_string(),
-        calendar: None,
-        number: None,
+        mode: cli.mode.unwrap_or("month".to_string()),
+        calendar: cli.calendar,
+        number: cli.number,
     })) {
         Commands::List(args) => args.validate().map(CalendarCommand::List),
         Commands::Add(args) => args.validate().map(CalendarCommand::Add),
