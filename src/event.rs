@@ -1,7 +1,7 @@
 use crate::calendar;
 use crate::cli;
 use anyhow::{anyhow, Result};
-use chrono::{Datelike, Duration, Local, NaiveDate};
+use chrono::{Datelike, Duration, Local, NaiveDate, Timelike};
 use colored::Colorize;
 use std::io::Write;
 use std::process::Command;
@@ -86,38 +86,36 @@ pub fn add(cmd: cli::CalendarAddArgs) -> Result<()> {
             cli::RepeatFrequency::Yearly => cmd.start.date() + Duration::days(3652),
         });
 
-        println!("{:?}", until);
-
         let mut i = 0;
         loop {
             if i % every == 0 {
                 match repeat {
                     cli::RepeatFrequency::Daily => {
-                        let start = cmd.start.date() + Duration::days(i.into());
+                        let start = cmd.start + Duration::days(i.into());
 
-                        if start >= until {
+                        if start >= until.into() {
                             break;
                         }
 
-                        let duration = cmd.end.date() - cmd.start.date();
+                        let duration = cmd.end - cmd.start;
                         let end = start + duration;
 
                         calendar.add_event(
                             cmd.name.clone(),
-                            start.into(),
-                            end.into(),
+                            start,
+                            end,
                             cmd.loc.clone(),
                             cmd.desc.clone(),
                         )?;
                     }
                     cli::RepeatFrequency::Weekly => {
-                        let start = cmd.start.date() + Duration::days((i * 7).into());
+                        let start = cmd.start + Duration::days((i * 7).into());
 
-                        if start >= until {
+                        if start >= until.into() {
                             break;
                         }
 
-                        let duration = cmd.end.date() - cmd.start.date();
+                        let duration = cmd.end - cmd.start;
                         let end = start + duration;
 
                         calendar.add_event(
@@ -129,10 +127,13 @@ pub fn add(cmd: cli::CalendarAddArgs) -> Result<()> {
                         )?;
                     }
                     cli::RepeatFrequency::Monthly => {
-                        let start_date = cmd.start.date();
+                        let start_date = cmd.start;
                         let mut year = start_date.year();
                         let mut month = start_date.month();
                         let day = start_date.day();
+                        let hour = start_date.hour();
+                        let min = start_date.minute();
+                        let sec = start_date.second();
 
                         month += i;
                         while month > 12 {
@@ -140,44 +141,51 @@ pub fn add(cmd: cli::CalendarAddArgs) -> Result<()> {
                             year += 1;
                         }
 
-                        let start = get_real_date(year, month, day)?;
+                        let start = get_real_date(year, month, day)?
+                            .and_hms_opt(hour, min, sec)
+                            .ok_or_else(|| anyhow!("Failed to create NaiveDateTime"))?;
 
-                        if start >= until {
+                        if start >= until.into() {
                             break;
                         }
 
-                        let duration = cmd.end.date() - cmd.start.date();
+                        let duration = cmd.end - cmd.start;
                         let end = start + duration;
 
                         calendar.add_event(
                             cmd.name.clone(),
-                            start.into(),
-                            end.into(),
+                            start,
+                            end,
                             cmd.loc.clone(),
                             cmd.desc.clone(),
                         )?;
                     }
                     cli::RepeatFrequency::Yearly => {
-                        let start_date = cmd.start.date();
+                        let start_date = cmd.start;
                         let mut year = start_date.year();
                         let month = start_date.month();
                         let day = start_date.day();
+                        let hour = start_date.hour();
+                        let min = start_date.minute();
+                        let sec = start_date.second();
 
                         year += i as i32;
 
-                        let start = get_real_date(year, month, day)?;
+                        let start = get_real_date(year, month, day)?
+                            .and_hms_opt(hour, min, sec)
+                            .ok_or_else(|| anyhow!("Failed to create NaiveDateTime"))?;
 
-                        if start >= until {
+                        if start >= until.into() {
                             break;
                         }
 
-                        let duration = cmd.end.date() - cmd.start.date();
+                        let duration = cmd.end - cmd.start;
                         let end = start + duration;
 
                         calendar.add_event(
                             cmd.name.clone(),
-                            start.into(),
-                            end.into(),
+                            start,
+                            end,
                             cmd.loc.clone(),
                             cmd.desc.clone(),
                         )?;

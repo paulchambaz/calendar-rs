@@ -11,12 +11,7 @@ pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
 
-    #[arg(
-        short,
-        long,
-        default_value = "month",
-        help = "View mode: day, week, month"
-    )]
+    #[arg(short, long, help = "View mode: day, week, month")]
     mode: Option<String>,
     #[arg(short, long, help = "Specify the calendar to view")]
     calendar: Option<String>,
