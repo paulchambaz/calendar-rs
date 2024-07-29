@@ -28,7 +28,7 @@
     in {
       packages.default = pkgs.rustPlatform.buildRustPackage {
         pname = "calendar-rs";
-        version = "1.0.1";
+        version = "1.0.2";
         src = ./.;
         cargoHash = "sha256-KEAjdbFoEezarLAV5L4f0yiiLqTI6JdeI066tRZVSbs=";
 

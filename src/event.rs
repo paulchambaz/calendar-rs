@@ -10,6 +10,10 @@ use terminal_size::{terminal_size, Width};
 
 pub fn list(cmd: cli::CalendarListArgs) -> Result<()> {
     let mut events = if let Some(calendar_name) = cmd.calendar {
+        if calendar_name == "personal" {
+            create_personal()?;
+        }
+
         // Load events from the specified calendar
         let calendar = calendar::load(&calendar_name)?;
         calendar.events
@@ -73,12 +77,7 @@ pub fn list(cmd: cli::CalendarListArgs) -> Result<()> {
 }
 
 pub fn add(cmd: cli::CalendarAddArgs) -> Result<()> {
-    let calendars = storage::list_calendars()?;
-
-    if !calendars.contains(&"personal".to_string()) {
-        println!("No personal calendar found. Creating it...");
-        storage::create_personal()?;
-    }
+    create_personal()?;
 
     let mut calendar = calendar::load(&cmd.calendar)?;
 
@@ -210,12 +209,7 @@ pub fn add(cmd: cli::CalendarAddArgs) -> Result<()> {
 }
 
 pub fn edit(cmd: cli::CalendarEditArgs) -> Result<()> {
-    let calendars = storage::list_calendars()?;
-
-    if !calendars.contains(&"personal".to_string()) {
-        println!("No personal calendar found. Creating it...");
-        storage::create_personal()?;
-    }
+    create_personal()?;
 
     let mut calendar = calendar::load(&cmd.calendar)?;
     calendar.edit_event(
@@ -231,12 +225,7 @@ pub fn edit(cmd: cli::CalendarEditArgs) -> Result<()> {
 }
 
 pub fn delete(cmd: cli::CalendarDeleteArgs) -> Result<()> {
-    let calendars = storage::list_calendars()?;
-
-    if !calendars.contains(&"personal".to_string()) {
-        println!("No personal calendar found. Creating it...");
-        storage::create_personal()?;
-    }
+    create_personal()?;
 
     let mut calendar = calendar::load(&cmd.calendar)?;
 
@@ -262,6 +251,10 @@ pub fn delete(cmd: cli::CalendarDeleteArgs) -> Result<()> {
 }
 
 pub fn show(cmd: cli::CalendarShowArgs) -> Result<()> {
+    if cmd.calendar == "personal" {
+        create_personal()?;
+    }
+
     let calendar = calendar::load(&cmd.calendar)?;
 
     let event = calendar
@@ -291,6 +284,10 @@ pub fn show(cmd: cli::CalendarShowArgs) -> Result<()> {
 
 pub fn view(cmd: cli::CalendarViewArgs) -> Result<()> {
     let mut events = if let Some(calendar_name) = cmd.calendar {
+        if calendar_name == "personal" {
+            create_personal()?;
+        }
+
         let calendar = calendar::load(&calendar_name)?;
         calendar.events
     } else {
@@ -480,8 +477,6 @@ pub fn sync(cmd: cli::CalendarSyncArgs) -> Result<()> {
     vdirsyncer_command.arg("--force-delete");
 
     if let Some(calendar) = cmd.calendar {
-        let _ = calendar::load(&calendar)?;
-
         vdirsyncer_command.arg(&calendar);
         println!("Syncing calendar '{}' with vdirsyncer", calendar);
     } else {
@@ -553,4 +548,14 @@ fn get_real_date(target_year: i32, target_month: u32, target_day: u32) -> Result
         target_year,
         target_month
     ))
+}
+fn create_personal() -> Result<()> {
+    let calendars = storage::list_calendars()?;
+
+    if !calendars.contains(&"personal".to_string()) {
+        println!("No personal calendar found. Creating it...");
+        storage::create_personal()?;
+    }
+
+    Ok(())
 }
