@@ -1,7 +1,6 @@
 use anyhow::{anyhow, Result};
 use chrono::NaiveDateTime;
 use std::path::PathBuf;
-use uuid::Uuid;
 
 use crate::storage;
 
@@ -13,7 +12,7 @@ pub struct Calendar {
 
 #[derive(Debug, Clone)]
 pub struct Event {
-    pub id: Uuid,
+    pub id: String,
     pub name: String,
     pub start: NaiveDateTime,
     pub end: NaiveDateTime,
@@ -45,9 +44,9 @@ impl Calendar {
         Ok(())
     }
 
-    pub fn remove_event(&mut self, event_id: Uuid) -> Result<()> {
+    pub fn remove_event(&mut self, event_id: String) -> Result<()> {
         let _ = self
-            .get_event(event_id)
+            .get_event(event_id.clone())
             .ok_or_else(|| anyhow!("Could not find event with this uuid"))?;
 
         storage::delete_event(&self.path, event_id)?;
@@ -57,7 +56,7 @@ impl Calendar {
 
     pub fn edit_event(
         &mut self,
-        id: Uuid,
+        id: String,
         name: Option<String>,
         start: Option<NaiveDateTime>,
         end: Option<NaiveDateTime>,
@@ -90,11 +89,11 @@ impl Calendar {
         Ok(())
     }
 
-    pub fn get_event(&self, id: Uuid) -> Option<&Event> {
+    pub fn get_event(&self, id: String) -> Option<&Event> {
         self.events.iter().find(|e| e.id == id)
     }
 
-    fn get_event_mut(&mut self, id: Uuid) -> Option<&mut Event> {
+    fn get_event_mut(&mut self, id: String) -> Option<&mut Event> {
         self.events.iter_mut().find(|e| e.id == id)
     }
 }
@@ -108,7 +107,7 @@ impl Event {
         description: Option<String>,
     ) -> Self {
         Event {
-            id: Uuid::new_v4(),
+            id: String::new(),
             name,
             start,
             end,

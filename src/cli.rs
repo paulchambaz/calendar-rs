@@ -3,7 +3,6 @@ use anyhow::{anyhow, Result};
 use chrono::{Duration, NaiveDate, NaiveDateTime};
 use clap::{Parser, Subcommand};
 use std::str::FromStr;
-use uuid::Uuid;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -64,7 +63,7 @@ pub struct CalendarAddArgs {
 
 #[derive(Debug)]
 pub struct CalendarEditArgs {
-    pub event_id: Uuid,
+    pub event_id: String,
     pub calendar: String,
     pub name: Option<String>,
     pub start: Option<NaiveDateTime>,
@@ -75,14 +74,14 @@ pub struct CalendarEditArgs {
 
 #[derive(Debug)]
 pub struct CalendarDeleteArgs {
-    pub event_id: Uuid,
+    pub event_id: String,
     pub calendar: String,
     pub force: bool,
 }
 
 #[derive(Debug)]
 pub struct CalendarShowArgs {
-    pub event_id: Uuid,
+    pub event_id: String,
     pub calendar: String,
 }
 
@@ -295,10 +294,6 @@ fn parse_datetime(datetime_str: &str) -> Result<NaiveDateTime> {
     Ok(CalendarDateTime::parse(datetime_str)?.inner())
 }
 
-fn parse_uuid(uuid_str: &str) -> Result<Uuid> {
-    Uuid::parse_str(uuid_str).map_err(|e| anyhow!("Invalid UUID: {}", e))
-}
-
 impl ListArgs {
     pub fn validate(self) -> Result<CalendarListArgs> {
         let query: Option<String> = Some(self.query.join(" "))
@@ -391,7 +386,7 @@ impl EditArgs {
     pub fn validate(self) -> Result<CalendarEditArgs> {
         let calendar = self.calendar.unwrap_or_else(|| "personal".to_string());
 
-        let event_id = parse_uuid(&self.event_id)?;
+        let event_id = self.event_id;
         let start = self.at.map(|w| parse_datetime(&w)).transpose()?;
         let end = self.to.map(|t| parse_datetime(&t)).transpose()?;
 
@@ -416,7 +411,7 @@ impl EditArgs {
 impl DeleteArgs {
     pub fn validate(self) -> Result<CalendarDeleteArgs> {
         let calendar = self.calendar.unwrap_or_else(|| "personal".to_string());
-        let event_id = parse_uuid(&self.event_id)?;
+        let event_id = self.event_id;
         Ok(CalendarDeleteArgs {
             event_id,
             calendar,
@@ -448,7 +443,7 @@ impl ViewArgs {
 impl ShowArgs {
     pub fn validate(self) -> Result<CalendarShowArgs> {
         let calendar = self.calendar.unwrap_or_else(|| "personal".to_string());
-        let event_id = parse_uuid(&self.event_id)?;
+        let event_id = self.event_id;
         Ok(CalendarShowArgs { event_id, calendar })
     }
 }

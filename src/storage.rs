@@ -108,7 +108,7 @@ fn read_event(path: &Path) -> Result<Event> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
     let mut event = Event {
-        id: Uuid::new_v4(),
+        id: String::new(),
         name: String::new(),
         start: Utc::now().naive_utc(),
         end: Utc::now().naive_utc(),
@@ -132,7 +132,7 @@ fn read_event(path: &Path) -> Result<Event> {
                     let main_key = key_parts[0];
 
                     match main_key {
-                        "UID" => event.id = Uuid::parse_str(value)?,
+                        "UID" => event.id = value.to_string(),
                         "SUMMARY" => event.name = value.to_string(),
                         "LOCATION" => event.location = Some(value.to_string()),
                         "DESCRIPTION" => event.description = Some(value.to_string()),
@@ -217,7 +217,7 @@ pub fn write_event(calendar_path: &Path, event: &Event) -> Result<()> {
     Ok(())
 }
 
-pub fn delete_event(calendar_path: &Path, event_id: Uuid) -> Result<()> {
+pub fn delete_event(calendar_path: &Path, event_id: String) -> Result<()> {
     let filename = format!("{}.ics", event_id);
     let file_path = calendar_path.join(filename);
 

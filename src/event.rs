@@ -231,7 +231,7 @@ pub fn delete(cmd: cli::CalendarDeleteArgs) -> Result<()> {
 
     if !cmd.force {
         let event = calendar
-            .get_event(cmd.event_id)
+            .get_event(cmd.event_id.clone())
             .ok_or_else(|| anyhow!("Could not find event with this uuid"))?;
         print!(
             "You are about to delete '{}', are you sure? (y/N) ",
