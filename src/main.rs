@@ -1,42 +1,67 @@
-mod calendar;
-mod cli;
-mod date;
-mod event;
-mod storage;
-use std::fs;
+mod args;
+mod storage {
+    pub mod files;
+    pub mod ics;
+}
+mod calendar {
+    pub mod events;
+    pub mod recurring;
+}
+mod display {
+    pub mod list;
+    pub mod calendar;
+    pub mod event;
+}
+mod commands;
+mod sync;
 
-use anyhow::{anyhow, Result};
+use args::{Command, ViewMode, parse, get_command};
+use commands::*;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let command = cli::parse_cli()?;
+fn main() {
+    let cli = parse();
+    let command = get_command(cli);
 
-    let home_dir = dirs::home_dir().ok_or_else(|| anyhow!("Unable to determine home directory"))?;
-    let calendar_dir = home_dir.join(".calendars");
-    fs::create_dir_all(&calendar_dir)?;
+    let result = match command {
+        Command::List { query, calendar, from, to, limit, id } => {
+            handle_list(query, calendar, from, to, limit, id)
+        }
+        
+        Command::Add { name, at, to, calendar, loc, desc, repeat, every, until } => {
+            handle_add(name, at, to, calendar, loc, desc, repeat, every, until)
+        }
+        
+        Command::Edit { event_id, calendar, name, at, to, loc, desc } => {
+            let calendar_name = calendar.unwrap_or_else(|| "personal".to_string());
+            handle_edit(event_id, calendar_name, name, at, to, loc, desc)
+        }
+        
+        Command::Delete { event_id, calendar, force } => {
+            let calendar_name = calendar.unwrap_or_else(|| "personal".to_string());
+            handle_delete(event_id, calendar_name, force)
+        }
+        
+        Command::Show { event_id, calendar } => {
+            let calendar_name = calendar.unwrap_or_else(|| "personal".to_string());
+            handle_show(event_id, calendar_name)
+        }
+        
+        Command::View { date, mode, calendar, number } => {
+            mode.parse::<ViewMode>()
+                .and_then(|view_mode| handle_view(date, view_mode, calendar, number))
+        }
+        
+        Command::Sync { calendar } => {
+            if sync::check_vdirsyncer_available() {
+                sync::sync_calendar(calendar)
+            } else {
+                Err("vdirsyncer is not installed or not in PATH".to_string())
+            }
+        }
+    };
 
-    match command {
-        cli::CalendarCommand::List(args) => {
-            event::list(args)?;
-        }
-        cli::CalendarCommand::Add(args) => {
-            event::add(args)?;
-        }
-        cli::CalendarCommand::Edit(args) => {
-            event::edit(args)?;
-        }
-        cli::CalendarCommand::Delete(args) => {
-            event::delete(args)?;
-        }
-        cli::CalendarCommand::Show(args) => {
-            event::show(args)?;
-        }
-        cli::CalendarCommand::View(args) => {
-            event::view(args)?;
-        }
-        cli::CalendarCommand::Sync(args) => {
-            event::sync(args)?;
-        }
+    if let Err(error) = result {
+        eprintln!("Error: {}", error);
+        std::process::exit(1);
     }
-
-    Ok(())
 }

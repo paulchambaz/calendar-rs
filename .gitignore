@@ -5,3 +5,4 @@
 *.profraw
 tarpaulin*
 *.bin
+.git
