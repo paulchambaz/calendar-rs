@@ -71,7 +71,6 @@ pub fn handle_add(
         return Err("Recurring events not yet implemented in new version".to_string());
     }
     
-    // Rest stays the same...
     ensure_calendar_exists(&calendar_name)?;
     
     let start = parse_datetime(&at)?;
@@ -222,7 +221,7 @@ pub fn handle_view(
     
     let options = calendar::CalendarOptions {
         date: target_date,
-        mode, // Use the ViewMode directly, no conversion needed
+        mode,
         number: number.unwrap_or(1),
     };
     

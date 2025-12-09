@@ -32,7 +32,7 @@
         pname = "calendar-rs";
         version = "1.0.2";
         src = ./.;
-        cargoHash = "sha256-yQ7Emv1hWn8PZttfjXS4XWAgs7XcfTrEgQZi89scI3E=";
+        cargoHash = "sha256-uyajvTPqS2rgaiaCVlHnjBAG96H6l79/CdfF+4MunuY=";
 
         nativeBuildInputs = buildPkgs;
         buildInputs = libPkgs;

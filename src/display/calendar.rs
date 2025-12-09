@@ -24,10 +24,12 @@ pub fn show_calendar(events: &EventList, options: &CalendarOptions) {
 fn show_day_view(events: &EventList, options: &CalendarOptions) {
     for i in 0..options.number {
         let target_date = options.date + chrono::Duration::days(i.into());
-        let day_events = events.on_date(target_date);
-
+        let mut day_events = events.on_date(target_date);
+        
+        // Sort events by start time
+        day_events.sort_by(|a, b| a.start.cmp(&b.start));
+        
         println!("{}", target_date.format("%A, %d %B %Y").to_string().bold());
-
         if day_events.is_empty() {
             println!("No events");
         } else {
@@ -35,7 +37,7 @@ fn show_day_view(events: &EventList, options: &CalendarOptions) {
                 print_event_time_line(event);
             }
         }
-
+        
         // Add spacing between days
         if i < options.number - 1 {
             println!();
@@ -47,13 +49,14 @@ fn show_day_view(events: &EventList, options: &CalendarOptions) {
 fn show_week_view(events: &EventList, options: &CalendarOptions) {
     for week in 0..options.number {
         let start_of_week = get_start_of_week(options.date + chrono::Duration::weeks(week.into()));
-
         for day in 0..7 {
             let current_date = start_of_week + chrono::Duration::days(day);
-            let day_events = events.on_date(current_date);
-
+            let mut day_events = events.on_date(current_date);
+            
+            // Sort events by start time
+            day_events.sort_by(|a, b| a.start.cmp(&b.start));
+            
             println!("{}", current_date.format("%A, %d %B").to_string().bold());
-
             if day_events.is_empty() {
                 println!("No events");
             } else {
@@ -63,7 +66,6 @@ fn show_week_view(events: &EventList, options: &CalendarOptions) {
             }
             println!();
         }
-
         // Add spacing between weeks
         if week < options.number - 1 {
             println!();
@@ -74,27 +76,93 @@ fn show_week_view(events: &EventList, options: &CalendarOptions) {
 /// Show month view for N months with upcoming events sidebar
 fn show_month_view(events: &EventList, options: &CalendarOptions) {
     let term_width = get_terminal_width();
-
+    
+    // Calculate the total number of rows for all months
+    let mut total_rows = 0;
+    let mut all_month_data = Vec::new();
+    
     for month_num in 0..options.number {
         let target_date = add_months_to_date(options.date, month_num);
         let (first_of_month, last_of_month) = get_month_bounds(target_date);
-
-        // Get upcoming events for this month
-        let upcoming_events = get_upcoming_events_for_month(events, first_of_month, last_of_month);
-        let mut upcoming_iter = upcoming_events.iter();
-
+        
+        let mut current_date = first_of_month
+            - chrono::Duration::days(first_of_month.weekday().num_days_from_monday() as i64);
+        
+        let mut month_rows = 0;
+        while current_date <= last_of_month {
+            month_rows += 1;
+            current_date = current_date + chrono::Duration::days(7);
+        }
+        
+        total_rows += month_rows + 2; // +2 for month header and weekday header
+        all_month_data.push((first_of_month, last_of_month, month_rows));
+    }
+    
+    // Get upcoming events from the start datetime (not just date)
+    let start_datetime = if options.date == chrono::Local::now().date_naive() {
+        chrono::Local::now().naive_local() // Start from now if viewing today
+    } else {
+        options.date.and_hms_opt(0, 0, 0).unwrap() // Start from beginning of specified date
+    };
+    
+    let mut upcoming_events: Vec<_> = events.all().iter()
+        .filter(|e| e.start >= start_datetime)
+        .collect();
+    upcoming_events.sort_by(|a, b| a.start.cmp(&b.start));
+    let upcoming_events: Vec<_> = upcoming_events.into_iter().take(total_rows).collect();
+    let mut upcoming_iter = upcoming_events.iter();
+    
+    // Display each month
+    for (month_index, (first_of_month, _last_of_month, row_count)) in all_month_data.into_iter().enumerate() {
+        // Add spacing between months - fill calendar space and show next event
+        if month_index > 0 {
+            print!("                     "); // 21 spaces to match calendar width
+            if let Some(event) = upcoming_iter.next() {
+                print_upcoming_event(event, term_width);
+            } else {
+                println!();
+            }
+        }
+        
         // Print month header
-        print_month_header(&first_of_month, &mut upcoming_iter, term_width);
-
-        // Print weekday header
-        print_weekday_header(&mut upcoming_iter, term_width, month_num == 0);
-
-        // Print calendar grid with events sidebar
-        print_month_grid(events, first_of_month, last_of_month, &mut upcoming_iter, term_width);
-
-        // Add spacing between months
-        if month_num < options.number - 1 {
+        let month_year = first_of_month.format("%B %Y").to_string().bold();
+        print!("{:^20} ", month_year);
+        if month_index == 0 {
+            println!(); // First month header gets its own line
+        } else if let Some(event) = upcoming_iter.next() {
+            print_upcoming_event(event, term_width);
+        } else {
             println!();
+        }
+        
+        // Print weekday header with "Coming up:" for first month only
+        if month_index == 0 {
+            println!("Mo Tu We Th Fr Sa Su    Coming up:"); // Coming up gets its own line
+        } else {
+            print!("Mo Tu We Th Fr Sa Su ");
+            if let Some(event) = upcoming_iter.next() {
+                print_upcoming_event(event, term_width);
+            } else {
+                println!();
+            }
+        }
+        
+        // Print calendar grid
+        let mut current_date = first_of_month
+            - chrono::Duration::days(first_of_month.weekday().num_days_from_monday() as i64);
+        
+        for _week in 0..row_count {
+            for _weekday in 0..7 {
+                print_day_cell(current_date, first_of_month.month(), chrono::Local::now().date_naive(), events);
+                current_date = current_date + chrono::Duration::days(1);
+            }
+            
+            // Print upcoming event for this row
+            if let Some(event) = upcoming_iter.next() {
+                print_upcoming_event(event, term_width);
+            } else {
+                println!();
+            }
         }
     }
 }
@@ -139,72 +207,6 @@ fn add_months_to_date(date: NaiveDate, months: u32) -> NaiveDate {
     }
 
     NaiveDate::from_ymd_opt(year, month, 1).unwrap()
-}
-
-/// Get upcoming events for the month, limited and sorted
-fn get_upcoming_events_for_month(events: &EventList, first: NaiveDate, last: NaiveDate) -> Vec<&Event> {
-    let mut upcoming: Vec<&Event> = events.all().iter()
-        .filter(|e| e.start.date() >= first && e.start.date() <= last)
-        .collect();
-    
-    upcoming.sort_by(|a, b| a.start.cmp(&b.start));
-    upcoming.truncate(20); // Limit to avoid too many
-    upcoming
-}
-
-/// Print month header with optional upcoming event
-fn print_month_header(first_of_month: &NaiveDate, upcoming_iter: &mut std::slice::Iter<&Event>, term_width: u16) {
-    let month_year = first_of_month.format("%B %Y").to_string().bold();
-    print!("{:^20} ", month_year);
-    
-    if let Some(event) = upcoming_iter.next() {
-        print_upcoming_event(event, term_width);
-    } else {
-        println!();
-    }
-}
-
-/// Print weekday header with optional upcoming event
-fn print_weekday_header(upcoming_iter: &mut std::slice::Iter<&Event>, term_width: u16, show_coming_up: bool) {
-    if show_coming_up {
-        print!("Mo Tu We Th Fr Sa Su    Coming up:");
-    } else {
-        print!("Mo Tu We Th Fr Sa Su ");
-    }
-    
-    if let Some(event) = upcoming_iter.next() {
-        print_upcoming_event(event, term_width);
-    } else {
-        println!();
-    }
-}
-
-/// Print the month grid with events sidebar
-fn print_month_grid(events: &EventList, first: NaiveDate, last: NaiveDate, upcoming_iter: &mut std::slice::Iter<&Event>, term_width: u16) {
-    let mut current_date = get_start_of_week(first);
-    let today = chrono::Local::now().date_naive();
-
-    while current_date <= last || current_date.month() == first.month() {
-        // Print one week
-        let week_start = current_date;
-        
-        for _day in 0..7 {
-            print_day_cell(current_date, first.month(), today, events);
-            current_date = current_date + chrono::Duration::days(1);
-        }
-
-        // Print upcoming event for this week row
-        if let Some(event) = upcoming_iter.next() {
-            print_upcoming_event(event, term_width);
-        } else {
-            println!();
-        }
-
-        // Stop if we've gone past the month
-        if current_date > last && week_start.month() != first.month() {
-            break;
-        }
-    }
 }
 
 /// Print a single day cell in the calendar grid
